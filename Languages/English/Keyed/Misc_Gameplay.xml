@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<LanguageData>
+	<RT.MaxTravelPeriodForNPCCaravans>Max travel period for NPC caravans: </RT.MaxTravelPeriodForNPCCaravans>
+	<RT.FactionTraderSpawnChanceWeightsPerRelation>Faction trader spawn chance modifiers per relations</RT.FactionTraderSpawnChanceWeightsPerRelation>
+	<RT.FactionSpawnChancePerRelation>Faction trader selection weight per {0}x relation: </RT.FactionSpawnChancePerRelation>
+	<RT.FactionTraderSpawnChanceWeightsPerBaseCount>Faction trader spawn chance modifiers per faction settlement count in {0} travel days from player settlement</RT.FactionTraderSpawnChanceWeightsPerBaseCount>
+	<RT.FactionSpawnChancePerBaseCount>Faction trader selection weight per {0} settlement count: </RT.FactionSpawnChancePerBaseCount>
+</LanguageData>
