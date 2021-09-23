@@ -32,7 +32,20 @@ namespace RealisticTrade
             return tracker;
         }
     }
-
+    [HarmonyPatch(typeof(StorytellerComp), "IncidentChanceFinal")]
+    public static class IncidentChanceFinal_Patch
+    {
+        public static void Postfix(IncidentDef def, ref float __result)
+        {
+            if (def == IncidentDefOf.TraderCaravanArrival)
+            {
+                var mainMap = Find.RandomPlayerHomeMap;
+                Log.Message($"Base chance is {__result}");
+                __result *= mainMap.GetTradingTracker().GetIncidentCountPerYearModifier();
+                Log.Message($"2 Modified chance is {__result}");
+            }
+        }
+    }
     [HarmonyPatch]
     public static class StorytellerComp_FactionInteraction_Patch
     {
@@ -69,29 +82,85 @@ namespace RealisticTrade
             {
                 var count = target.GetTradingTracker().FriendlySettlementsNearby().Count;
                 var modifier = RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count);
+                var season = GenLocalDate.Season(target.Tile);
+                modifier *= RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season);
                 Log.Message($"Count of neutral/ally bases around {target} is {count}");
-                Log.Message($"Base incident count per year is {instance.Props.baseIncidentsPerYear}, now it's {instance.Props.baseIncidentsPerYear * modifier}");
+                Log.Message($"Season is {season}");
+                Log.Message($"1 Base incident count per year is {instance.Props.baseIncidentsPerYear}, now it's {instance.Props.baseIncidentsPerYear * modifier}");
                 return modifier;
             }
             return 1f; // we keep it as is so we don't touch the base value
         }
+
     }
 
-    [HarmonyPatch(typeof(IncidentWorker_TraderCaravanArrival), "TraderKindCommonality")]
-    public static class TraderKindCommonality_Patch
+    [HarmonyPatch(typeof(IncidentWorker_TraderCaravanArrival), "TryResolveParmsGeneral")]
+    public static class TryResolveParmsGeneral_Patch
     {
-        public static void Postfix(TraderKindDef traderKind, Map map, Faction faction, ref float __result)
+        [HarmonyPriority(int.MaxValue)]
+        public static bool Prefix(IncidentWorker_TraderCaravanArrival __instance, IncidentParms parms, ref bool __result)
         {
+            __result = TryResolveParmsGeneral(__instance, parms);
+            return false;
+        }
+        private static bool TryResolveParmsGeneral(IncidentWorker_TraderCaravanArrival __instance, IncidentParms parms)
+        {
+            Map map = (Map)parms.target;
+            if (!parms.spawnCenter.IsValid && !RCellFinder.TryFindRandomPawnEntryCell(out parms.spawnCenter, map, CellFinder.EdgeRoadChance_Neutral))
+            {
+                return false;
+            }
+            foreach (var fac in __instance.CandidateFactions(map))
+            {
+                Log.Message("Candidate: " + fac + " - " + fac.def);
+            }
+            if (parms.faction == null && !__instance.CandidateFactions(map).TryRandomElementByWeight(x => GetWeight(map, x), out parms.faction) 
+                && !__instance.CandidateFactions(map, desperate: true).TryRandomElementByWeight(x => GetWeight(map, x), out parms.faction))
+            {
+                return false;
+            }
+            if (parms.traderKind == null)
+            {
+                if (!parms.faction.def.caravanTraderKinds.TryRandomElementByWeight((TraderKindDef traderDef) => __instance.TraderKindCommonality(traderDef, map, parms.faction), out parms.traderKind))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public static float GetWeight(Map map, Faction faction)
+        {
+            float weight = 1f;
             var settlements = map.GetTradingTracker().FriendlySettlementsNearby();
-            var factionBaseCount = settlements.Count(x => x.Faction == faction);
+            var settlementsOfFaction = settlements.Where(x => x.Faction == faction).ToList();
+            var factionBaseCount = settlementsOfFaction.Count;
             var goodwill = faction.GoodwillWith(map.ParentFaction);
-            Log.Message($"Base trader kind commonality is {__result} for {faction}");
+
             Log.Message($"Amount of nearby settlement of {faction} is {factionBaseCount}");
             Log.Message($"Goodwill of {faction} with {map.ParentFaction} is {goodwill}");
+
             var factionBaseCountWeight = RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(factionBaseCount);
             var relationsCountWeight = RealisticTradeMod.settings.relationBonusCurve.Evaluate(goodwill);
-            __result *= factionBaseCountWeight * relationsCountWeight;
-            Log.Message($"Modified trader kind commonality for {faction} is {__result} now. Faction base count weight: {factionBaseCountWeight}, relation count weight: {relationsCountWeight}");
+            weight *= factionBaseCountWeight * relationsCountWeight;
+            string extraMess = "";
+            if (settlementsOfFaction.Any())
+            {
+                var nearestDayTravelDuration = settlementsOfFaction.Select(x => CaravanArrivalTimeEstimator.EstimatedTicksToArrive(x.Tile, map.Tile, null) / 60000f).OrderBy(x => x).First();
+                Log.Message($"Nearest travel day is {nearestDayTravelDuration}");
+                var travelDayWeight = RealisticTradeMod.settings.dayTravelBonusCurve.Evaluate(nearestDayTravelDuration);
+                extraMess += $", travel day weight: {travelDayWeight}";
+                weight *= travelDayWeight;
+            }
+            else
+            {
+                var travelDayWeight = RealisticTradeMod.settings.dayTravelBonusCurve.Evaluate(RealisticTradeMod.settings.maxTravelDistancePeriodForTrading);
+                extraMess += $"{faction} has no settlement bases around {map}, setting travel day lowest value: {travelDayWeight}";
+                weight *= travelDayWeight;
+            }
+            string logMessage = $"Faction trade incident commonality for {faction} is {weight}. Faction base count weight: {factionBaseCountWeight}, relation count weight: {relationsCountWeight}";
+            Log.Message(logMessage + extraMess);
+            return weight;
         }
     }
 
@@ -105,6 +174,29 @@ namespace RealisticTrade
         public TradingTracker(Map map) : base(map)
         {
 
+        }
+
+        //public override void MapComponentTick()
+        //{
+        //    base.MapComponentTick();
+        //    for (var i = 0; i < 1; i++)
+        //    {
+        //        Find.Storyteller.incidentQueue.IncidentQueueTick();
+        //        foreach (FiringIncident item in Find.Storyteller.MakeIncidentsForInterval())
+        //        {
+        //            Find.Storyteller.TryFire(item);
+        //        }
+        //    }
+        //}
+        public float GetIncidentCountPerYearModifier()
+        {
+            var count = this.FriendlySettlementsNearby().Count;
+            var modifier = RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count);
+            var season = GenLocalDate.Season(map.Tile);
+            modifier *= RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season);
+            Log.Message($"Count of neutral/ally bases around {this} is {count}, weight: {RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count)}");
+            Log.Message($"Season is {season}, weight: {RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season)}");
+            return modifier;
         }
         public List<Settlement> FriendlySettlementsNearby()
         {

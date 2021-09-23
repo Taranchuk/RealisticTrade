@@ -15,19 +15,30 @@ namespace RealisticTrade
     class RealisticTradeSettings : ModSettings
     {
         public int maxTravelDistancePeriodForTrading = 7;
+
         private Dictionary<float, float> relationBonus = new Dictionary<float, float>();
         public SimpleCurve relationBonusCurve;
 
         private Dictionary<int, float> factionBaseCountBonus = new Dictionary<int, float>();
         public SimpleCurve factionBaseCountBonusCurve;
+
+        private Dictionary<float, float> dayTravelBonus = new Dictionary<float, float>();
+        public SimpleCurve dayTravelBonusCurve;
+
+        private Dictionary<int, float> seasonImpactBonus = new Dictionary<int, float>();
+        public SimpleCurve seasonImpactBonusCurve;
         public override void ExposeData()
         {
             base.ExposeData();
             Scribe_Values.Look(ref maxTravelDistancePeriodForTrading, "maxTravelDistancePeriodForTrading", 7);
             Scribe_Collections.Look(ref relationBonus, "relationBonus");
             Scribe_Collections.Look(ref factionBaseCountBonus, "factionBaseCountBonus");
+            Scribe_Collections.Look(ref dayTravelBonus, "dayTravelBonus");
+            Scribe_Collections.Look(ref seasonImpactBonus, "seasonImpactBonus");
             RebuildRelationBonusCurve();
             RebuildFactionBaseCountBonusCurve();
+            RebuildDayTravelBonusCurve();
+            RebuildSeasonImpactBonusCurve();
         }
         public void DoSettingsWindowContents(Rect inRect)
         {
@@ -55,10 +66,29 @@ namespace RealisticTrade
                 listingStandard.SliderLabeled("RT.FactionSpawnChancePerBaseCount".Translate(dictKey), ref value, (value * 100f).ToStringDecimalIfSmall() + "%", 0f, 5f);
                 factionBaseCountBonus[dictKey] = value;
             }
+            listingStandard.GapLine();
+            listingStandard.Label("RT.FactionTraderSpawnChanceWeightsPerTravelDayCount".Translate());
+            foreach (var dictKey in dayTravelBonus.Keys.ToList())
+            {
+                var value = dayTravelBonus[dictKey];
+                listingStandard.SliderLabeled("RT.FactionSpawnChancePerTravelDayCount".Translate("PeriodDays".Translate(dictKey)), ref value, (value * 100f).ToStringDecimalIfSmall() + "%", 0f, 5f);
+                dayTravelBonus[dictKey] = value;
+            }
+
+            listingStandard.GapLine();
+            listingStandard.Label("RT.FactionTraderSpawnChanceWeightsPerSeasonImpact".Translate());
+            foreach (var dictKey in seasonImpactBonus.Keys.ToList())
+            {
+                var value = seasonImpactBonus[dictKey];
+                listingStandard.SliderLabeled("RT.FactionSpawnChancePerSeasonImpact".Translate(((Season)dictKey).Label()), ref value, (value * 100f).ToStringDecimalIfSmall() + "%", 0f, 5f);
+                seasonImpactBonus[dictKey] = value;
+            }
             listingStandard.End();
             Widgets.EndScrollView();
             RebuildRelationBonusCurve();
             RebuildFactionBaseCountBonusCurve();
+            RebuildDayTravelBonusCurve();
+            RebuildSeasonImpactBonusCurve();
             base.Write();
         }
 
@@ -117,6 +147,58 @@ namespace RealisticTrade
                 factionBaseCountBonusCurve.Add(new CurvePoint(dictKey, value));
             }
         }
+
+        public void InitDayTravelBonus()
+        {
+            dayTravelBonus = new Dictionary<float, float>()
+                {
+                    {1f, 1.5f},
+                    {2f, 1.2f},
+                    {3f, 1f},
+                    {4f, 0.8f},
+                    {6f, 0.6f},
+                    {7f, 0.4f},
+                };
+        }
+        public void RebuildDayTravelBonusCurve()
+        {
+            if (dayTravelBonus is null || dayTravelBonus.Count == 0)
+            {
+                InitDayTravelBonus();
+            }
+            dayTravelBonusCurve = new SimpleCurve();
+            foreach (var dictKey in dayTravelBonus.Keys.ToList().OrderBy(x => x))
+            {
+                var value = dayTravelBonus[dictKey];
+                dayTravelBonusCurve.Add(new CurvePoint(dictKey, value));
+            }
+        }
+        public void InitSeasonImpactBonus()
+        {
+            seasonImpactBonus = new Dictionary<int, float>()
+                {
+                    {1, 0.5f},
+                    {2, 1f},
+                    {3, 0.5f},
+                    {4, 0.25f},
+                    {5, 1f},
+                    {6, 0.25f},
+                };
+        }
+        public void RebuildSeasonImpactBonusCurve()
+        {
+            if (seasonImpactBonus is null || seasonImpactBonus.Count == 0)
+            {
+                InitSeasonImpactBonus();
+            }
+            seasonImpactBonusCurve = new SimpleCurve();
+            foreach (var dictKey in seasonImpactBonus.Keys.ToList().OrderBy(x => x))
+            {
+                var value = seasonImpactBonus[dictKey];
+                seasonImpactBonusCurve.Add(new CurvePoint(dictKey, value));
+            }
+        }
+
         private static Vector2 scrollPosition = Vector2.zero;
     }
 }
