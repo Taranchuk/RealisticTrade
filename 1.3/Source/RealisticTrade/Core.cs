@@ -63,6 +63,7 @@ namespace RealisticTrade
         public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             var baseIncidentsPerYearField = AccessTools.Field(typeof(StorytellerCompProperties_FactionInteraction), "baseIncidentsPerYear");
+            var minSpacingDaysField = AccessTools.Field(typeof(StorytellerCompProperties_FactionInteraction), "minSpacingDays");
             foreach (CodeInstruction code in instructions)
             {
                 yield return code;
@@ -72,6 +73,13 @@ namespace RealisticTrade
                     yield return new CodeInstruction(OpCodes.Ldloc_2);
                     yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(StorytellerComp_FactionInteraction_Patch), "GetIncidentCountPerYearModifier"));
                     yield return new CodeInstruction(OpCodes.Mul);
+                }
+                if (code.LoadsField(minSpacingDaysField))
+                {
+                    yield return new CodeInstruction(OpCodes.Ldloc_1);
+                    yield return new CodeInstruction(OpCodes.Ldloc_2);
+                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(StorytellerComp_FactionInteraction_Patch), "GetIncidentCountPerYearModifier"));
+                    yield return new CodeInstruction(OpCodes.Div);
                 }
             }
         }
@@ -137,8 +145,8 @@ namespace RealisticTrade
             var factionBaseCount = settlementsOfFaction.Count;
             var goodwill = faction.GoodwillWith(map.ParentFaction);
 
-            Log.Message($"Amount of nearby settlement of {faction} is {factionBaseCount}");
-            Log.Message($"Goodwill of {faction} with {map.ParentFaction} is {goodwill}");
+            Log.Message($"Faction: {faction} - Amount of nearby settlement of {faction} is {factionBaseCount}");
+            Log.Message($"Faction: {faction} - Goodwill of {faction} with {map.ParentFaction} is {goodwill}");
 
             var factionBaseCountWeight = RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(factionBaseCount);
             var relationsCountWeight = RealisticTradeMod.settings.relationBonusCurve.Evaluate(goodwill);
@@ -147,7 +155,7 @@ namespace RealisticTrade
             if (settlementsOfFaction.Any())
             {
                 var nearestDayTravelDuration = settlementsOfFaction.Select(x => CaravanArrivalTimeEstimator.EstimatedTicksToArrive(x.Tile, map.Tile, null) / 60000f).OrderBy(x => x).First();
-                Log.Message($"Nearest travel day is {nearestDayTravelDuration}");
+                Log.Message($"Faction: {faction} - Nearest travel day is {nearestDayTravelDuration}");
                 var travelDayWeight = RealisticTradeMod.settings.dayTravelBonusCurve.Evaluate(nearestDayTravelDuration);
                 extraMess += $", travel day weight: {travelDayWeight}";
                 weight *= travelDayWeight;
@@ -158,7 +166,7 @@ namespace RealisticTrade
                 extraMess += $"{faction} has no settlement bases around {map}, setting travel day lowest value: {travelDayWeight}";
                 weight *= travelDayWeight;
             }
-            string logMessage = $"Faction trade incident commonality for {faction} is {weight}. Faction base count weight: {factionBaseCountWeight}, relation count weight: {relationsCountWeight}";
+            string logMessage = $"Faction: {faction} - Faction trade incident commonality for {faction} is {weight}. Faction base count weight: {factionBaseCountWeight}, relation count weight: {relationsCountWeight}";
             Log.Message(logMessage + extraMess);
             return weight;
         }
@@ -208,20 +216,21 @@ namespace RealisticTrade
                     Log.ResetMessageCount();
                     if (x.Faction.HostileTo(map.ParentFaction))
                     {
-                        Log.Message($"{x} is hostile, can't send traders");
+                        Log.Message($"Faction: {x.Faction} - {x} is hostile, can't send traders");
                         return false;
                     }
                     var daysToArrive = CaravanArrivalTimeEstimator.EstimatedTicksToArrive(x.Tile, map.Tile, null) / 60000f;
-                    Log.Message($"Estimated days to arrive from {x} to {map} is {daysToArrive}");
+                    Log.Message($"Faction: {x.Faction} - Estimated days to arrive from {x} to {map} is {daysToArrive}");
                     if (daysToArrive > RealisticTradeMod.settings.maxTravelDistancePeriodForTrading)
                     {
-                        Log.Message($"{x} can't send traders, too far");
+                        Log.Message($"Faction: {x.Faction} - {x} can't send traders, too far");
                         return false;
                     }
-                    Log.Message($"{x} can send traders, is close");
+                    Log.Message($"Faction: {x.Faction} - {x} can send traders, is close");
                     return true;
                 };
-                friendlySettlementsNearby = Find.World.worldObjects.SettlementBases.Where(x => validator(x)).ToList();
+
+                friendlySettlementsNearby = Find.World.worldObjects.SettlementBases.OrderBy(x => x.Faction?.GetHashCode() ?? 1).Where(x => validator(x)).ToList();
                 lastNearbySettlementCheckTick = Find.TickManager.TicksGame;
             }
             return friendlySettlementsNearby;
