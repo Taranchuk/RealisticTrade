@@ -215,7 +215,10 @@ namespace RealisticTrade
                 friendlySettlementsNearby = new List<Settlement>();
                 Predicate<Settlement> validator = delegate (Settlement x)
                 {
-                    Log.ResetMessageCount();
+                    if (x.Faction == map.ParentFaction)
+                    {
+                        return false;
+                    }
                     if (x.Faction.HostileTo(map.ParentFaction))
                     {
                         return false;
@@ -228,7 +231,7 @@ namespace RealisticTrade
                     return true;
                 };
 
-                friendlySettlementsNearby = Find.World.worldObjects.SettlementBases.OrderBy(x => x.Faction?.GetHashCode() ?? 1).Where(x => validator(x)).ToList();
+                friendlySettlementsNearby = Find.World.worldObjects.SettlementBases.Where(x => validator(x)).ToList();
                 lastNearbySettlementCheckTick = Find.TickManager.TicksGame;
             }
             return friendlySettlementsNearby;
