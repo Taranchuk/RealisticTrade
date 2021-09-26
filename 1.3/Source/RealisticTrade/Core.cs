@@ -40,9 +40,9 @@ namespace RealisticTrade
             if (def == IncidentDefOf.TraderCaravanArrival)
             {
                 var mainMap = Find.RandomPlayerHomeMap;
-                Log.Message($"Base chance is {__result}");
+                Log.Message($"FINAL_TRADER_PER_YEAR Base chance is {__result} per year");
                 __result *= mainMap.GetTradingTracker().GetIncidentCountPerYearModifier();
-                Log.Message($"FINAL_VALUE 2 Modified chance is {__result}");
+                Log.Message($"FINAL_TRADER_PER_YEAR Modified chance is {__result} per year");
             }
         }
     }
@@ -92,9 +92,9 @@ namespace RealisticTrade
                 var modifier = RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count);
                 var season = GenLocalDate.Season(target.Tile);
                 modifier *= RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season);
-                Log.Message($"FINAL_VALUE Count of neutral/ally bases around {target} is {count}");
-                Log.Message($"FINAL_VALUE Season is {season}");
-                Log.Message($"FINAL_VALUE 1 Base incident count per year is {instance.Props.baseIncidentsPerYear}, now it's {instance.Props.baseIncidentsPerYear * modifier}");
+                Log.Message($"FINAL_TRADER_PER_YEAR Count of neutral/ally bases around {target} is {count}");
+                Log.Message($"FINAL_TRADER_PER_YEAR Season is {season}");
+                Log.Message($"FINAL_TRADER_PER_YEAR 1 Base incident count per year is {instance.Props.baseIncidentsPerYear}, now it's {instance.Props.baseIncidentsPerYear * modifier}");
                 return modifier;
             }
             return 1f; // we keep it as is so we don't touch the base value
@@ -202,8 +202,8 @@ namespace RealisticTrade
             var modifier = RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count);
             var season = GenLocalDate.Season(map.Tile);
             modifier *= RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season);
-            Log.Message($"FINAL_VALUE Count of neutral/ally bases around {this} is {count}, weight: {RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count)}");
-            Log.Message($"FINAL_VALUE Season is {season}, weight: {RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season)}");
+            Log.Message($"FINAL_TRADER_PER_YEAR Count of neutral/ally bases around {this.map} is {count}, weight: {RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count)}");
+            Log.Message($"FINAL_TRADER_PER_YEAR Season is {season}, weight: {RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season)}");
             return modifier;
         }
         public List<Settlement> FriendlySettlementsNearby()
