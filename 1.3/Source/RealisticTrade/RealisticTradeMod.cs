@@ -20,6 +20,7 @@ namespace RealisticTrade
         public RealisticTradeMod(ModContentPack pack) : base(pack)
         {
             settings = GetSettings<RealisticTradeSettings>();
+            settings.ReInitValues();
         }
         public override void DoSettingsWindowContents(Rect inRect)
         {

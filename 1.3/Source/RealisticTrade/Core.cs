@@ -40,13 +40,13 @@ namespace RealisticTrade
             if (def == IncidentDefOf.TraderCaravanArrival)
             {
                 var mainMap = Find.RandomPlayerHomeMap;
-                Log.Message("----------------------------");
-                Log.Message($"FINAL_TRADER_PER_YEAR Base chance of trader arrival is {__result} per year");
-                __result *= mainMap.GetTradingTracker().GetIncidentCountPerYearModifier();
-                Log.Message($"FINAL_TRADER_PER_YEAR Final Modified chance is {__result} per year");
+                var oldValue = __result;
+                __result *= mainMap.GetTradingTracker().GetTradeIncidentSpawnOrCountModifier();
+                Log.Message($"FINAL_TRADER_PER_YEAR Base chance of trader arrival is {oldValue} per year, final modified chance is {__result}");
             }
         }
     }
+
     [HarmonyPatch]
     public static class StorytellerComp_FactionInteraction_Patch
     {
@@ -61,25 +61,32 @@ namespace RealisticTrade
             }
             return null;
         }
+
+        public static float storeValue;
         public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             var baseIncidentsPerYearField = AccessTools.Field(typeof(StorytellerCompProperties_FactionInteraction), "baseIncidentsPerYear");
             var minSpacingDaysField = AccessTools.Field(typeof(StorytellerCompProperties_FactionInteraction), "minSpacingDays");
+            var storeValueField = AccessTools.Field(typeof(StorytellerComp_FactionInteraction_Patch), "storeValue");
+
             foreach (CodeInstruction code in instructions)
             {
                 yield return code;
-                if (code.LoadsField(baseIncidentsPerYearField))
+                if (code.opcode == OpCodes.Stloc_2)
                 {
                     yield return new CodeInstruction(OpCodes.Ldloc_1);
                     yield return new CodeInstruction(OpCodes.Ldloc_2);
                     yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(StorytellerComp_FactionInteraction_Patch), "GetIncidentCountPerYearModifier"));
+                    yield return new CodeInstruction(OpCodes.Stsfld, storeValueField);
+                }
+                if (code.LoadsField(baseIncidentsPerYearField))
+                {
+                    yield return new CodeInstruction(OpCodes.Ldsfld, storeValueField);
                     yield return new CodeInstruction(OpCodes.Mul);
                 }
                 if (code.LoadsField(minSpacingDaysField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldloc_1);
-                    yield return new CodeInstruction(OpCodes.Ldloc_2);
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(StorytellerComp_FactionInteraction_Patch), "GetIncidentCountPerYearModifier"));
+                    yield return new CodeInstruction(OpCodes.Ldsfld, storeValueField);
                     yield return new CodeInstruction(OpCodes.Div);
                 }
             }
@@ -89,13 +96,7 @@ namespace RealisticTrade
         {
             if (target != null && instance.Props.incident == IncidentDefOf.TraderCaravanArrival)
             {
-                var count = target.GetTradingTracker().FriendlySettlementsNearby().Count;
-                var modifier = RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count);
-                var season = GenLocalDate.Season(target.Tile);
-                modifier *= RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season);
-                Log.Message("----------------------------");
-                Log.Message($"FINAL_TRADER_PER_YEAR Count of neutral/ally bases (faction relatinship is >=0) around {target} is {count}");
-                Log.Message($"FINAL_TRADER_PER_YEAR Season is {season}");
+                var modifier = target.GetTradingTracker().GetTradeIncidentSpawnOrCountModifier();
                 Log.Message($"FINAL_TRADER_PER_YEAR Base incident count per year is {instance.Props.baseIncidentsPerYear}, now it's {instance.Props.baseIncidentsPerYear * modifier}");
                 return modifier;
             }
@@ -142,15 +143,14 @@ namespace RealisticTrade
         public static float GetWeight(Map map, Faction faction)
         {
             float weight = 1f;
-            var settlements = map.GetTradingTracker().FriendlySettlementsNearby();
-            var settlementsOfFaction = settlements.Where(x => x.Faction == faction).ToList();
+            var settlementsOfFaction = map.GetTradingTracker().FriendlySettlementsNearby().Where(x => x.Faction == faction).ToList();
             var factionBaseCount = settlementsOfFaction.Count;
             var goodwill = faction.GoodwillWith(map.ParentFaction);
 
             Log.Message($"Faction: {faction} - Amount of nearby settlements of {faction} in {RealisticTradeMod.settings.maxTravelDistancePeriodForTrading} travel days range is {factionBaseCount}");
             Log.Message($"Faction: {faction} - Goodwill of {faction} with {map.ParentFaction} is {goodwill}");
 
-            var factionBaseCountWeight = RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(factionBaseCount);
+            var factionBaseCountWeight = RealisticTradeMod.settings.factionBaseDensityBonusCurve.Evaluate(factionBaseCount);
             var relationsCountWeight = RealisticTradeMod.settings.relationBonusCurve.Evaluate(goodwill);
             weight *= factionBaseCountWeight * relationsCountWeight;
             string extraMess = "";
@@ -198,19 +198,24 @@ namespace RealisticTrade
         //        }
         //    }
         //}
-        public float GetIncidentCountPerYearModifier()
+        public float GetTradeIncidentSpawnOrCountModifier()
         {
             var count = this.FriendlySettlementsNearby().Count;
-            var modifier = RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count);
             var season = GenLocalDate.Season(map.Tile);
+            var mapWealth = this.map.wealthWatcher.WealthTotal;
+
+            var modifier = RealisticTradeMod.settings.totalSettlementCountBonusCurve.Evaluate(count);
             modifier *= RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season);
-            Log.Message($"FINAL_TRADER_PER_YEAR Count of neutral/ally bases (faction relatinship is >=0) around {this.map} is {count}, weight: {RealisticTradeMod.settings.factionBaseCountBonusCurve.Evaluate(count)}");
+            modifier *= RealisticTradeMod.settings.colonyWealthAttractionBonusCurve.Evaluate(mapWealth);
+
+            Log.Message($"FINAL_TRADER_PER_YEAR map wealth in {this.map} is {mapWealth}, weight: {RealisticTradeMod.settings.colonyWealthAttractionBonusCurve.Evaluate(mapWealth)}");
+            Log.Message($"FINAL_TRADER_PER_YEAR Count of neutral/ally bases (faction relatinship is >=0) around {this.map} is {count}, weight: {RealisticTradeMod.settings.totalSettlementCountBonusCurve.Evaluate(count)}");
             Log.Message($"FINAL_TRADER_PER_YEAR Season is {season}, weight: {RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season)}");
             return modifier;
         }
         public List<Settlement> FriendlySettlementsNearby()
         {
-            if (lastNearbySettlementCheckTick + 15000 > Find.TickManager.TicksGame || lastNearbySettlementCheckTick <= 0)
+            if (Find.TickManager.TicksGame > lastNearbySettlementCheckTick + GenDate.TicksPerDay || lastNearbySettlementCheckTick <= 0)
             {
                 friendlySettlementsNearby = new List<Settlement>();
                 Predicate<Settlement> validator = delegate (Settlement x)
