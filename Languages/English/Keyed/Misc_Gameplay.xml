@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <LanguageData>
+	<RT.GeneralSettings>General settings</RT.GeneralSettings>
+	<RT.ResetValues>Reset settings values</RT.ResetValues>
+	<RT.WorldSize>World size ({0}): </RT.WorldSize>
+	<RT.ScaleValuesByWorldCoverage>Scale values by world coverage</RT.ScaleValuesByWorldCoverage>
 	<RT.MaxTravelPeriodForNPCCaravans>Max travel period for NPC caravans: </RT.MaxTravelPeriodForNPCCaravans>
 	<RT.BaseTradeIncidentCountPerYear>Base trade incident count per year with {0}: {1}</RT.BaseTradeIncidentCountPerYear>
 	<RT.BaseTradeIncidentSpawnChance>Base trade incident spawn chance with {0}: {1}</RT.BaseTradeIncidentSpawnChance>
@@ -17,7 +21,7 @@
 
 	<RT.TradeFactionSpawnChanceModifiers>Trade faction spawn chance modifiers:</RT.TradeFactionSpawnChanceModifiers>
 	<RT.FactionTraderSpawnChanceWeightsPerRelation>Trader faction selection weights per relations</RT.FactionTraderSpawnChanceWeightsPerRelation>
-	<RT.FactionSpawnChancePerRelation>Trader faction selection weight per {0}x relation: </RT.FactionSpawnChancePerRelation>
+	<RT.FactionSpawnChancePerRelation>Trader faction selection weight per {0} relation: </RT.FactionSpawnChancePerRelation>
 	<RT.FactionTraderSpawnChanceWeightsPerTravelDayCount>Trader faction spawn chance modifiers per travel day duration from nearest faction settlement</RT.FactionTraderSpawnChanceWeightsPerTravelDayCount>
 	<RT.FactionSpawnChancePerTravelDayCount>Trader faction selection weight per {0} travel duration from nearest faction settlement: </RT.FactionSpawnChancePerTravelDayCount>
 	<RT.FactionTraderSpawnChanceWeightsPerFactionBaseDensity>Trader faction spawn chance per faction base density in {0} travel duration from player's settlement</RT.FactionTraderSpawnChanceWeightsPerFactionBaseDensity>

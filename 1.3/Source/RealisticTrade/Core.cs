@@ -151,6 +151,10 @@ namespace RealisticTrade
             Log.Message($"Faction: {faction} - Goodwill of {faction} with {map.ParentFaction} is {goodwill}");
 
             var factionBaseCountWeight = RealisticTradeMod.settings.factionBaseDensityBonusCurve.Evaluate(factionBaseCount);
+            if (RealisticTradeMod.settings.scaleValuesByWorldSize)
+            {
+                factionBaseCountWeight *= RealisticTradeMod.settings.worldSizeModifiersCurve.Evaluate(Find.World.PlanetCoverage);
+            }
             var relationsCountWeight = RealisticTradeMod.settings.relationBonusCurve.Evaluate(goodwill);
             weight *= factionBaseCountWeight * relationsCountWeight;
             string extraMess = "";
@@ -159,12 +163,21 @@ namespace RealisticTrade
                 var nearestDayTravelDuration = settlementsOfFaction.Select(x => CaravanArrivalTimeEstimator.EstimatedTicksToArrive(x.Tile, map.Tile, null) / 60000f).OrderBy(x => x).First();
                 Log.Message($"Faction: {faction} - Travel time days from the nearest settlement is {nearestDayTravelDuration}");
                 var travelDayWeight = RealisticTradeMod.settings.dayTravelBonusCurve.Evaluate(nearestDayTravelDuration);
+                if (RealisticTradeMod.settings.scaleValuesByWorldSize)
+                {
+                    travelDayWeight *= RealisticTradeMod.settings.worldSizeModifiersCurve.Evaluate(Find.World.PlanetCoverage);
+                }
+
                 extraMess += $", travel day weight: {travelDayWeight}";
                 weight *= travelDayWeight;
             }
             else
             {
                 var travelDayWeight = RealisticTradeMod.settings.dayTravelBonusCurve.Evaluate(RealisticTradeMod.settings.maxTravelDistancePeriodForTrading);
+                if (RealisticTradeMod.settings.scaleValuesByWorldSize)
+                {
+                    travelDayWeight *= RealisticTradeMod.settings.worldSizeModifiersCurve.Evaluate(Find.World.PlanetCoverage);
+                }
                 extraMess += $"{faction} has no settlement bases around {map}, setting travel day lowest value: {travelDayWeight}";
                 weight *= travelDayWeight;
             }
@@ -205,6 +218,10 @@ namespace RealisticTrade
             var mapWealth = this.map.wealthWatcher.WealthTotal;
 
             var modifier = RealisticTradeMod.settings.totalSettlementCountBonusCurve.Evaluate(count);
+            if (RealisticTradeMod.settings.scaleValuesByWorldSize)
+            {
+                modifier *= RealisticTradeMod.settings.worldSizeModifiersCurve.Evaluate(Find.World.PlanetCoverage);
+            }
             modifier *= RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season);
             modifier *= RealisticTradeMod.settings.colonyWealthAttractionBonusCurve.Evaluate(mapWealth);
 
