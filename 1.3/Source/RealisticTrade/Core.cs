@@ -250,6 +250,7 @@ namespace RealisticTrade
                     {
                         return false;
                     }
+                    Log.Message("Settlement: " + x);
                     return true;
                 };
 

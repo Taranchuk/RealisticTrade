@@ -12,6 +12,7 @@ using Verse.AI;
 
 namespace RealisticTrade
 {
+
     class RealisticTradeSettings : ModSettings
     {
         public int maxTravelDistancePeriodForTrading = 7;
@@ -69,7 +70,7 @@ namespace RealisticTrade
         private float ButtonsSize(float count) => buttonSize * count;
         private float ShortGapLinesSize(float count) => shortGapLineSize * count;
         private float GapLinesSize(float count) => gapLineSize * count;
-        public float GetTotalHeightAndSizes(out float generalSectionSize, out float tradeIncidentSpawnChanceSectionSize, out float tradeFactionSpawnChanceModifiersSectionSize)
+        public float GetTotalHeightAndSizes(out float generalSectionSize, out float impactSectionSize, out float tradeIncidentSpawnChanceSectionSize, out float tradeFactionSpawnChanceModifiersSectionSize)
         {
             generalSectionSize = ShortGapLinesSize(1) + ButtonsSize(4) + GapLinesSize(1);
             if (scaleValuesByWorldSize)
@@ -77,27 +78,35 @@ namespace RealisticTrade
                 generalSectionSize += GapLinesSize(1) + ButtonsSize(worldSizeModifiers.Keys.Count);
             }
 
-            tradeIncidentSpawnChanceSectionSize = ShortGapLinesSize(1);
+            impactSectionSize = ShortGapLinesSize(1) + ButtonsSize(1);
             if (Find.World != null)
             {
-                tradeIncidentSpawnChanceSectionSize += ButtonsSize(2);
+                impactSectionSize += ButtonsSize(2);
+                var comp = StorytellComp_FactionInteraction();
+                if (comp != null)
+                {
+                    impactSectionSize += ButtonsSize(2);
+                }
             }
+
+            tradeIncidentSpawnChanceSectionSize = ShortGapLinesSize(1);
             tradeIncidentSpawnChanceSectionSize += ButtonsSize(4) + GapLinesSize(2)
                 + ButtonsSize(colonyWealthAttractionBonus.Keys.Count) 
                 + ButtonsSize(seasonImpactBonus.Keys.Count) 
                 + ButtonsSize(totalSettlementCountBonus.Keys.Count);
+
 
             tradeFactionSpawnChanceModifiersSectionSize = ShortGapLinesSize(1) + ButtonsSize(4) + GapLinesSize(2)
                 + ButtonsSize(relationBonus.Keys.Count)
                 + ButtonsSize(factionBaseDensityBonus.Keys.Count)
                 + ButtonsSize(dayTravelBonus.Keys.Count);
 
-            return generalSectionSize + gapLineSize + tradeIncidentSpawnChanceSectionSize + gapLineSize + tradeFactionSpawnChanceModifiersSectionSize + 30;
+            return generalSectionSize + gapLineSize + impactSectionSize + gapLineSize + tradeIncidentSpawnChanceSectionSize + gapLineSize + tradeFactionSpawnChanceModifiersSectionSize + 50;
         }
         public void DoSettingsWindowContents(Rect inRect)
         {
             ReInitValues();
-            var totalHeight = GetTotalHeightAndSizes(out float generalSectionSize, out float tradeIncidentSpawnChanceSectionSize, out float tradeFactionSpawnChanceModifiersSectionSize);
+            var totalHeight = GetTotalHeightAndSizes(out float generalSectionSize, out float impactSectionSize, out float tradeIncidentSpawnChanceSectionSize, out float tradeFactionSpawnChanceModifiersSectionSize);
             Rect rect = new Rect(inRect.x, inRect.y, inRect.width, inRect.height);
             Rect rect2 = new Rect(0f, 0f, inRect.width - 30f, totalHeight);
             Widgets.BeginScrollView(rect, ref scrollPosition, rect2, true);
@@ -135,22 +144,37 @@ namespace RealisticTrade
             }
             listingStandard.EndSection(generalSection);
             listingStandard.Gap();
-            var tradeIncidentSpawnChanceSection = listingStandard.BeginSection(tradeIncidentSpawnChanceSectionSize);
+
+            var impactSection = listingStandard.BeginSection(impactSectionSize);
+            impactSection.Label("RT.Impact".Translate(Find.Storyteller.def.LabelCap));
+            impactSection.GapLine(8);
+
             if (Find.World != null)
             {
-                var incidentCount = GetBaseTradeIncidentCount();
-                if (incidentCount.HasValue)
+                var comp = StorytellComp_FactionInteraction();
+                var baseIncidentCount = comp?.Props?.baseIncidentsPerYear;
+                if (baseIncidentCount.HasValue)
                 {
-                    tradeIncidentSpawnChanceSection.Label("RT.BaseTradeIncidentCountPerYear".Translate(Find.Storyteller.def.LabelCap, incidentCount.Value));
-                    tradeIncidentSpawnChanceSection.Label("RT.FinalTradeIncidentCountPerYear".Translate(Find.Storyteller.def.LabelCap, GetFinalTradeIncidentCount().Value));
+                    impactSection.Label("RT.BaseTradeIncidentCountPerYear".Translate(baseIncidentCount.Value));
+                    impactSection.Label("RT.FinalTradeIncidentCountPerYear".Translate(baseIncidentCount.Value * StorytellerComp_FactionInteraction_Patch.GetIncidentCountPerYearModifier(comp, Find.AnyPlayerHomeMap)));
                 }
                 else
                 {
                     var incidentChance = GetBaseTradeIncidentChance();
-                    tradeIncidentSpawnChanceSection.Label("RT.BaseTradeIncidentSpawnChance".Translate(Find.Storyteller.def.LabelCap, incidentChance));
-                    tradeIncidentSpawnChanceSection.Label("RT.FinalTradeIncidentSpawnChance".Translate(Find.Storyteller.def.LabelCap, GetFinalTradeIncidentChance()));
+                    impactSection.Label("RT.BaseTradeIncidentSpawnChance".Translate(incidentChance));
+                    impactSection.Label("RT.FinalTradeIncidentSpawnChance".Translate(GetFinalTradeIncidentChance()));
+                }
+
+                if (comp != null)
+                {
+                    impactSection.Label("RT.Base".Translate("MinSpacingDays", comp.Props.minSpacingDays));
+                    impactSection.Label("RT.Final".Translate("MinSpacingDays", comp.Props.minDaysPassed / StorytellerComp_FactionInteraction_Patch.GetIncidentCountPerYearModifier(comp, Find.AnyPlayerHomeMap)));
                 }
             }
+            listingStandard.EndSection(impactSection);
+            listingStandard.Gap();
+
+            var tradeIncidentSpawnChanceSection = listingStandard.BeginSection(tradeIncidentSpawnChanceSectionSize);
             tradeIncidentSpawnChanceSection.Label("RT.TradeIncidentSpawnChanceModifiers".Translate());
             tradeIncidentSpawnChanceSection.GapLine(8);
             
@@ -218,15 +242,9 @@ namespace RealisticTrade
             Widgets.EndScrollView();
             base.Write();
         }
-        private float? GetBaseTradeIncidentCount()
+        private StorytellerComp_FactionInteraction StorytellComp_FactionInteraction()
         {
-            var comp = Find.Storyteller.storytellerComps.FirstOrDefault(x => x is StorytellerComp_FactionInteraction sc && sc.Props.incident == IncidentDefOf.TraderCaravanArrival) as StorytellerComp_FactionInteraction;
-            return comp?.Props?.baseIncidentsPerYear;
-        }
-        private float? GetFinalTradeIncidentCount()
-        {
-            var comp = Find.Storyteller.storytellerComps.FirstOrDefault(x => x is StorytellerComp_FactionInteraction sc && sc.Props.incident == IncidentDefOf.TraderCaravanArrival) as StorytellerComp_FactionInteraction;
-            return comp?.Props?.baseIncidentsPerYear * StorytellerComp_FactionInteraction_Patch.GetIncidentCountPerYearModifier(comp, Find.AnyPlayerHomeMap);
+            return Find.Storyteller.storytellerComps.FirstOrDefault(x => x is StorytellerComp_FactionInteraction sc && sc.Props.incident == IncidentDefOf.TraderCaravanArrival) as StorytellerComp_FactionInteraction;
         }
         private float GetBaseTradeIncidentChance()
         {
@@ -338,10 +356,15 @@ namespace RealisticTrade
 
             if (maxTravelDistancePeriodForTrading > dayTravelBonus.MaxBy(x => x.Key).Key)
             {
+                if (maxTravelDistancePeriodForTrading < 7)
+                {
+                    InitDayTravelBonus();
+                }
                 var toAdd = maxTravelDistancePeriodForTrading - dayTravelBonus.Count;
                 for (var i = 0; i < toAdd; i++)
                 {
-                    dayTravelBonus[i + maxTravelDistancePeriodForTrading] = 0.4f;
+                    var value = dayTravelBonus.TryGetValue(i, out var dayTravel) ? dayTravel : 0.4f;
+                    dayTravelBonus[i + maxTravelDistancePeriodForTrading] = value;
                 }
             }
             if (dayTravelBonus.MaxBy(x => x.Key).Key > maxTravelDistancePeriodForTrading)
