@@ -199,18 +199,18 @@ namespace RealisticTrade
 
         }
 
-        //public override void MapComponentTick()
-        //{
-        //    base.MapComponentTick();
-        //    for (var i = 0; i < 1; i++)
-        //    {
-        //        Find.Storyteller.incidentQueue.IncidentQueueTick();
-        //        foreach (FiringIncident item in Find.Storyteller.MakeIncidentsForInterval())
-        //        {
-        //            Find.Storyteller.TryFire(item);
-        //        }
-        //    }
-        //}
+        public override async void MapComponentTick()
+        {
+            base.MapComponentTick();
+            if (Find.TickManager.TicksGame % 2500 == 0)
+            {
+                friendlySettlementsNearby = await Task.Run(() =>
+                {
+                    return CalculateFriendlySettlementsNearby();
+                });
+            }
+        }
+
         public float GetTradeIncidentSpawnOrCountModifier()
         {
             var count = this.FriendlySettlementsNearby().Count;
@@ -232,34 +232,39 @@ namespace RealisticTrade
         }
         public List<(Settlement settlement, float daysToArrive)> FriendlySettlementsNearby()
         {
-            if (Find.TickManager.TicksGame > lastNearbySettlementCheckTick + GenDate.TicksPerDay || lastNearbySettlementCheckTick <= 0)
+            if (friendlySettlementsNearby != null && lastNearbySettlementCheckTick > 0)
             {
-                friendlySettlementsNearby = new List<(Settlement settlement, float daysToArrive)>();
-                Predicate<Settlement> validator = delegate (Settlement x)
-                {
-                    if (x.Faction == map.ParentFaction)
-                    {
-                        return false;
-                    }
-                    if (x.Faction.HostileTo(map.ParentFaction))
-                    {
-                        return false;
-                    }
-                    return true;
-                };
-
-                var settlements = Find.World.worldObjects.SettlementBases.Where(x => validator(x)).ToList();
-                foreach (var settlement in settlements)
-                {
-                    var daysToArrive = CaravanArrivalTimeEstimator.EstimatedTicksToArrive(settlement.Tile, map.Tile, null) / 60000f;
-                    Log.Message("settlement: " + settlement + " - daysToArrive: " + daysToArrive + " - maxTravelDistancePeriodForTrading: " + RealisticTradeMod.settings.maxTravelDistancePeriodForTrading);
-                    if (daysToArrive <= RealisticTradeMod.settings.maxTravelDistancePeriodForTrading)
-                    {
-                        friendlySettlementsNearby.Add((settlement, daysToArrive));
-                    }
-                }
-                lastNearbySettlementCheckTick = Find.TickManager.TicksGame;
+                return friendlySettlementsNearby;
             }
+            return CalculateFriendlySettlementsNearby();
+        }
+
+        private List<(Settlement settlement, float daysToArrive)> CalculateFriendlySettlementsNearby()
+        {
+            friendlySettlementsNearby = new List<(Settlement settlement, float daysToArrive)>();
+            Predicate<Settlement> validator = delegate (Settlement x)
+            {
+                if (x.Faction == map.ParentFaction)
+                {
+                    return false;
+                }
+                if (x.Faction.HostileTo(map.ParentFaction))
+                {
+                    return false;
+                }
+                return true;
+            };
+
+            var settlements = Find.World.worldObjects.SettlementBases.Where(x => validator(x)).ToList();
+            foreach (var settlement in settlements)
+            {
+                var daysToArrive = CaravanArrivalTimeEstimator.EstimatedTicksToArrive(settlement.Tile, map.Tile, null) / 60000f;
+                if (daysToArrive <= RealisticTradeMod.settings.maxTravelDistancePeriodForTrading)
+                {
+                    friendlySettlementsNearby.Add((settlement, daysToArrive));
+                }
+            }
+            lastNearbySettlementCheckTick = Find.TickManager.TicksGame;
             return friendlySettlementsNearby;
         }
     }
