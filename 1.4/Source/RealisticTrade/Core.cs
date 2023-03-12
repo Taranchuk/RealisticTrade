@@ -259,7 +259,7 @@ namespace RealisticTrade
             foreach (var settlement in settlements)
             {
                 var daysToArrive = CaravanArrivalTimeEstimator.EstimatedTicksToArrive(settlement.Tile, map.Tile, null) / 60000f;
-                if (daysToArrive <= RealisticTradeMod.settings.maxTravelDistancePeriodForTrading)
+                if (daysToArrive > 0 && daysToArrive <= RealisticTradeMod.settings.maxTravelDistancePeriodForTrading)
                 {
                     friendlySettlementsNearby.Add((settlement, daysToArrive));
                 }
