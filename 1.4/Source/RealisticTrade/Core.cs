@@ -35,6 +35,7 @@ namespace RealisticTrade
     [HarmonyPatch(typeof(StorytellerComp), "IncidentChanceFinal")]
     public static class IncidentChanceFinal_Patch
     {
+        public static int lastLogTime = -1;
         public static void Postfix(IncidentDef def, ref float __result)
         {
             if (def == IncidentDefOf.TraderCaravanArrival)
@@ -42,7 +43,11 @@ namespace RealisticTrade
                 var mainMap = Find.RandomPlayerHomeMap;
                 var oldValue = __result;
                 __result *= mainMap.GetTradingTracker().GetTradeIncidentSpawnOrCountModifier();
-                Log.Message($"FINAL_TRADER_PER_YEAR Base chance of trader arrival is {oldValue} per year, final modified chance is {__result}");
+                if (lastLogTime == -1 || Find.TickManager.TicksGame - lastLogTime >= GenDate.TicksPerDay)
+                {
+                    lastLogTime = Find.TickManager.TicksGame;
+                    Log.Message($"FINAL_TRADER_PER_YEAR Base chance of trader arrival is {oldValue} per year, final modified chance is {__result}");
+                }
             }
         }
     }
@@ -92,12 +97,17 @@ namespace RealisticTrade
             }
         }
 
+        public static int lastLogTime = -1;
         public static float GetIncidentCountPerYearModifier(StorytellerComp_FactionInteraction instance, Map target)
         {
             if (target != null && instance.Props.incident == IncidentDefOf.TraderCaravanArrival)
             {
                 var modifier = target.GetTradingTracker().GetTradeIncidentSpawnOrCountModifier();
-                Log.Message($"FINAL_TRADER_PER_YEAR Base incident count per year is {instance.Props.baseIncidentsPerYear}, now it's {instance.Props.baseIncidentsPerYear * modifier}");
+                if (lastLogTime == -1 || Find.TickManager.TicksGame - lastLogTime >= GenDate.TicksPerDay)
+                {
+                    lastLogTime = Find.TickManager.TicksGame;
+                    Log.Message($"FINAL_TRADER_PER_YEAR Base incident count per year is {instance.Props.baseIncidentsPerYear}, now it's {instance.Props.baseIncidentsPerYear * modifier}");
+                }
                 return modifier;
             }
             return 1f; // we keep it as is so we don't touch the base value
@@ -121,10 +131,6 @@ namespace RealisticTrade
             {
                 return false;
             }
-            foreach (var fac in __instance.CandidateFactions(map))
-            {
-                Log.Message("Candidate: " + fac + " - " + fac.def);
-            }
             if (parms.faction == null && !__instance.CandidateFactions(map).TryRandomElementByWeight(x => GetWeight(map, x), out parms.faction) 
                 && !__instance.CandidateFactions(map, desperate: true).TryRandomElementByWeight(x => GetWeight(map, x), out parms.faction))
             {
@@ -140,15 +146,40 @@ namespace RealisticTrade
             return true;
         }
 
+        public static Dictionary<Faction, Dictionary<Map, FactionWeight>> cachedData = new Dictionary<Faction, Dictionary<Map, FactionWeight>>();
+        public class FactionWeight
+        {
+            public float weight;
+            public int updatedTick;
+        }
+
         public static float GetWeight(Map map, Faction faction)
+        {
+            if (!cachedData.TryGetValue(faction, out var data))
+            {
+                cachedData[faction] = data = new Dictionary<Map, FactionWeight>();
+            }
+            if (!data.TryGetValue(map, out var factionWeight))
+            {
+                data[map] = factionWeight = new FactionWeight();
+            }
+            if (factionWeight.updatedTick <= 0 || Find.TickManager.TicksGame - factionWeight.updatedTick >= GenDate.TicksPerDay)
+            {
+                factionWeight.weight = GetWeightInt(map, faction);
+                factionWeight.updatedTick = Find.TickManager.TicksGame;
+            }
+            return factionWeight.weight;
+        }
+
+        private static float GetWeightInt(Map map, Faction faction)
         {
             float weight = 1f;
             var settlementsOfFaction = map.GetTradingTracker().FriendlySettlementsNearby().Where(x => x.settlement.Faction == faction).ToList();
             var factionBaseCount = settlementsOfFaction.Count;
             var goodwill = faction.GoodwillWith(map.ParentFaction);
-
-            Log.Message($"Faction: {faction} - Amount of nearby settlements of {faction} in {RealisticTradeMod.settings.maxTravelDistancePeriodForTrading} travel days range is {factionBaseCount}");
-            Log.Message($"Faction: {faction} - Goodwill of {faction} with {map.ParentFaction} is {goodwill}");
+            Log.Message("Checking map " + map + " for faction " + faction);
+            Log.Message($"{faction} - Amount of nearby settlements of {faction} in {RealisticTradeMod.settings.maxTravelDistancePeriodForTrading} travel days range is {factionBaseCount}");
+            Log.Message($"{faction} - Goodwill of {faction} with {map.ParentFaction} is {goodwill}");
 
             var factionBaseCountWeight = RealisticTradeMod.settings.factionBaseDensityBonusCurve.Evaluate(factionBaseCount);
             if (RealisticTradeMod.settings.scaleValuesByWorldSize)
@@ -167,7 +198,7 @@ namespace RealisticTrade
                 {
                     travelDayWeight *= RealisticTradeMod.settings.worldSizeModifiersCurve.Evaluate(Find.World.PlanetCoverage);
                 }
-                extraMess += $", travel day weight: {travelDayWeight}";
+                extraMess += $", travel day factionWeight: {travelDayWeight}";
                 weight *= travelDayWeight;
             }
             else
@@ -180,7 +211,7 @@ namespace RealisticTrade
                 extraMess += $"{faction} has no settlement bases around {map}, setting travel day lowest value: {travelDayWeight}";
                 weight *= travelDayWeight;
             }
-            string logMessage = $"Faction: {faction} - Final Faction trade incident commonality for {faction} is {weight}. Calculated from - faction base count weight: {factionBaseCountWeight}, relation count weight: {relationsCountWeight}";
+            string logMessage = $"Faction: {faction} - Final Faction trade incident commonality for {faction} is {weight}. Calculated from - faction base count factionWeight: {factionBaseCountWeight}, relation count factionWeight: {relationsCountWeight}";
             Log.Message(logMessage + extraMess);
             return weight;
         }
@@ -210,6 +241,7 @@ namespace RealisticTrade
             }
         }
 
+        public int lastLogTime = -1;
         public float GetTradeIncidentSpawnOrCountModifier()
         {
             var count = this.FriendlySettlementsNearby().Count;
@@ -223,10 +255,13 @@ namespace RealisticTrade
             }
             modifier *= RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season);
             modifier *= RealisticTradeMod.settings.colonyWealthAttractionBonusCurve.Evaluate(mapWealth);
-
-            Log.Message($"FINAL_TRADER_PER_YEAR map wealth in {this.map} is {mapWealth}, weight: {RealisticTradeMod.settings.colonyWealthAttractionBonusCurve.Evaluate(mapWealth)}");
-            Log.Message($"FINAL_TRADER_PER_YEAR Count of neutral/ally bases (faction relatinship is >=0) around {this.map} is {count}, weight: {RealisticTradeMod.settings.totalSettlementCountBonusCurve.Evaluate(count)}");
-            Log.Message($"FINAL_TRADER_PER_YEAR Season is {season}, weight: {RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season)}");
+            if (lastLogTime == -1 || Find.TickManager.TicksGame - lastLogTime >= GenDate.TicksPerDay)
+            {
+                lastLogTime = Find.TickManager.TicksGame;
+                Log.Message($"FINAL_TRADER_PER_YEAR map wealth in {this.map} is {mapWealth}, factionWeight: {RealisticTradeMod.settings.colonyWealthAttractionBonusCurve.Evaluate(mapWealth)}");
+                Log.Message($"FINAL_TRADER_PER_YEAR Count of neutral/ally bases (faction relatinship is >=0) around {this.map} is {count}, factionWeight: {RealisticTradeMod.settings.totalSettlementCountBonusCurve.Evaluate(count)}");
+                Log.Message($"FINAL_TRADER_PER_YEAR Season is {season}, factionWeight: {RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season)}");
+            }
             return modifier;
         }
         public List<(Settlement settlement, float daysToArrive)> FriendlySettlementsNearby()
