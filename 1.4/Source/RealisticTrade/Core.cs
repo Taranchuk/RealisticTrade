@@ -201,7 +201,7 @@ namespace RealisticTrade
         public override async void MapComponentTick()
         {
             base.MapComponentTick();
-            if (Find.TickManager.TicksGame % 60000 == 0)
+            if (map.IsPlayerHome && Find.TickManager.TicksGame % 60000 == 0)
             {
                 friendlySettlementsNearby = await Task.Run(() =>
                 {
