@@ -70,7 +70,7 @@ namespace RealisticTrade
         private float ButtonsSize(float count) => buttonSize * count;
         private float ShortGapLinesSize(float count) => shortGapLineSize * count;
         private float GapLinesSize(float count) => gapLineSize * count;
-        public float GetTotalHeightAndSizes(out float generalSectionSize, out float impactSectionSize, out float tradeIncidentSpawnChanceSectionSize, out float tradeFactionSpawnChanceModifiersSectionSize)
+        public float GetTotalHeightAndSizes(out float generalSectionSize, out float impactSectionSize, out float factionWeightSize, out float tradeIncidentSpawnChanceSectionSize, out float tradeFactionSpawnChanceModifiersSectionSize)
         {
             generalSectionSize = ShortGapLinesSize(1) + ButtonsSize(4) + GapLinesSize(1);
             if (scaleValuesByWorldSize)
@@ -78,14 +78,36 @@ namespace RealisticTrade
                 generalSectionSize += GapLinesSize(1) + ButtonsSize(worldSizeModifiers.Keys.Count);
             }
 
-            impactSectionSize = ShortGapLinesSize(1) + ButtonsSize(1);
+            impactSectionSize = 0;
+            factionWeightSize = 0;
             if (Find.World != null)
             {
+                impactSectionSize += ShortGapLinesSize(1) + ButtonsSize(1);
                 impactSectionSize += ButtonsSize(2);
                 var comp = StorytellComp_FactionInteraction();
                 if (comp != null)
                 {
                     impactSectionSize += ButtonsSize(2);
+                }
+
+                factionWeightSize += ShortGapLinesSize(1) + ButtonsSize(1);
+                var incidentWorker = new IncidentWorker_TraderCaravanArrival
+                {
+                    def = IncidentDefOf.TraderCaravanArrival
+                };
+                foreach (var map in Find.Maps)
+                {
+                    if (map.IsPlayerHome)
+                    {
+                        factionWeightSize += ButtonsSize(1);
+                        var factionsWithWeight = Find.FactionManager.AllFactions.Where((Faction f) =>
+                        incidentWorker.FactionCanBeGroupSource(f, map, true))
+                            .Select(x => (x, TryResolveParmsGeneral_Patch.GetWeight(map, x))).OrderByDescending(x => x.Item2).Take(5).ToList();
+                        for (var i = 0; i < factionsWithWeight.Count; i++)
+                        {
+                            factionWeightSize += ButtonsSize(1);
+                        }
+                    }
                 }
             }
 
@@ -101,12 +123,20 @@ namespace RealisticTrade
                 + ButtonsSize(factionBaseDensityBonus.Keys.Count)
                 + ButtonsSize(dayTravelBonus.Keys.Count);
 
-            return generalSectionSize + gapLineSize + impactSectionSize + gapLineSize + tradeIncidentSpawnChanceSectionSize + gapLineSize + tradeFactionSpawnChanceModifiersSectionSize + 50;
+            if (Find.World != null)
+            {
+                return generalSectionSize + gapLineSize + impactSectionSize + gapLineSize + factionWeightSize + gapLineSize +
+                    tradeIncidentSpawnChanceSectionSize + gapLineSize + tradeFactionSpawnChanceModifiersSectionSize + 50;
+            }
+            else
+            {
+                return generalSectionSize + gapLineSize + tradeIncidentSpawnChanceSectionSize + gapLineSize + tradeFactionSpawnChanceModifiersSectionSize + 50;
+            }
         }
         public void DoSettingsWindowContents(Rect inRect)
         {
             ReInitValues();
-            var totalHeight = GetTotalHeightAndSizes(out float generalSectionSize, out float impactSectionSize, out float tradeIncidentSpawnChanceSectionSize, out float tradeFactionSpawnChanceModifiersSectionSize);
+            var totalHeight = GetTotalHeightAndSizes(out float generalSectionSize, out float impactSectionSize, out float factionWeightSize, out float tradeIncidentSpawnChanceSectionSize, out float tradeFactionSpawnChanceModifiersSectionSize);
             Rect rect = new Rect(inRect.x, inRect.y, inRect.width, inRect.height);
             Rect rect2 = new Rect(0f, 0f, inRect.width - 30f, totalHeight);
             Widgets.BeginScrollView(rect, ref scrollPosition, rect2, true);
@@ -145,12 +175,12 @@ namespace RealisticTrade
             listingStandard.EndSection(generalSection);
             listingStandard.Gap();
 
-            var impactSection = listingStandard.BeginSection(impactSectionSize);
-            impactSection.Label("RT.Impact".Translate(Find.Storyteller.def.LabelCap));
-            impactSection.GapLine(8);
-
             if (Find.World != null)
             {
+                var impactSection = listingStandard.BeginSection(impactSectionSize);
+                impactSection.Label("RT.Impact".Translate(Find.Storyteller.def.LabelCap));
+                impactSection.GapLine(8);
+
                 var comp = StorytellComp_FactionInteraction();
                 var baseIncidentCount = comp?.Props?.baseIncidentsPerYear;
                 if (baseIncidentCount.HasValue)
@@ -167,12 +197,38 @@ namespace RealisticTrade
 
                 if (comp != null)
                 {
-                    impactSection.Label("RT.Base".Translate("MinSpacingDays", comp.Props.minSpacingDays));
-                    impactSection.Label("RT.Final".Translate("MinSpacingDays", comp.Props.minDaysPassed / StorytellerComp_FactionInteraction_Patch.GetIncidentCountPerYearModifier(comp, Find.AnyPlayerHomeMap)));
+                    impactSection.Label("RT.BaseMinimumTimeBetweenCaravansArrival".Translate(comp.Props.minSpacingDays));
+                    impactSection.Label("RT.FinalMinimumTimeBetweenCaravansArrival".Translate(comp.Props.minDaysPassed / StorytellerComp_FactionInteraction_Patch.GetIncidentCountPerYearModifier(comp, Find.AnyPlayerHomeMap)));
                 }
+                listingStandard.EndSection(impactSection);
+                listingStandard.Gap();
+
+                var factionWeightSection = listingStandard.BeginSection(factionWeightSize);
+                factionWeightSection.Label("RT.MostProbablyFactionsForTrading".Translate());
+                factionWeightSection.GapLine(8);
+                var incidentWorker = new IncidentWorker_TraderCaravanArrival
+                {
+                    def = IncidentDefOf.TraderCaravanArrival
+                };
+                foreach (var map in Find.Maps)
+                {
+                    if (map.IsPlayerHome)
+                    {
+                        factionWeightSection.Label(map.Parent.LabelCap);
+                        var factionsWithWeight = Find.FactionManager.AllFactions.Where((Faction f) =>
+                        incidentWorker.FactionCanBeGroupSource(f, map, true))
+                            .Select(x => (x, TryResolveParmsGeneral_Patch.GetWeight(map, x))).OrderByDescending(x => x.Item2).Take(5).ToList();
+                        for (var i = 0; i < factionsWithWeight.Count; i++)
+                        {
+                            var kvp = factionsWithWeight[i];
+                            factionWeightSection.Label("RT.FactionWithFinalWeight".Translate(i + 1, kvp.x.Name, kvp.Item2.ToString("0.00")));
+                        }
+                    }
+                }
+
+                listingStandard.EndSection(factionWeightSection);
+                listingStandard.Gap();
             }
-            listingStandard.EndSection(impactSection);
-            listingStandard.Gap();
 
             var tradeIncidentSpawnChanceSection = listingStandard.BeginSection(tradeIncidentSpawnChanceSectionSize);
             tradeIncidentSpawnChanceSection.Label("RT.TradeIncidentSpawnChanceModifiers".Translate());

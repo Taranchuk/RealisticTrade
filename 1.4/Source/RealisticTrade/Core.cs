@@ -167,7 +167,6 @@ namespace RealisticTrade
                 {
                     travelDayWeight *= RealisticTradeMod.settings.worldSizeModifiersCurve.Evaluate(Find.World.PlanetCoverage);
                 }
-
                 extraMess += $", travel day weight: {travelDayWeight}";
                 weight *= travelDayWeight;
             }
@@ -202,7 +201,7 @@ namespace RealisticTrade
         public override async void MapComponentTick()
         {
             base.MapComponentTick();
-            if (Find.TickManager.TicksGame % 2500 == 0)
+            if (Find.TickManager.TicksGame % 60000 == 0)
             {
                 friendlySettlementsNearby = await Task.Run(() =>
                 {
@@ -232,7 +231,7 @@ namespace RealisticTrade
         }
         public List<(Settlement settlement, float daysToArrive)> FriendlySettlementsNearby()
         {
-            if (friendlySettlementsNearby != null && lastNearbySettlementCheckTick > 0)
+            if (friendlySettlementsNearby != null && friendlySettlementsNearby.Any() && lastNearbySettlementCheckTick > 0)
             {
                 return friendlySettlementsNearby;
             }

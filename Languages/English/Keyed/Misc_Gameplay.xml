@@ -8,6 +8,8 @@
 	<RT.BaseTradeIncidentCountPerYear>Base trade incident count per year: {0}</RT.BaseTradeIncidentCountPerYear>
 	<RT.BaseTradeIncidentSpawnChance>Base trade incident spawn chance: {0}</RT.BaseTradeIncidentSpawnChance>
 	
+	<RT.BaseMinimumTimeBetweenCaravansArrival>Base minimum time between caravans arrival: {0}</RT.BaseMinimumTimeBetweenCaravansArrival>
+	<RT.FinalMinimumTimeBetweenCaravansArrival>Final minimum time between caravans arrival: {0}</RT.FinalMinimumTimeBetweenCaravansArrival>
 	<RT.FinalTradeIncidentCountPerYear>Final trade incident count per year: {0}</RT.FinalTradeIncidentCountPerYear>
 	<RT.FinalTradeIncidentSpawnChance>Final trade incident spawn chance: {0}</RT.FinalTradeIncidentSpawnChance>
 	
@@ -26,7 +28,10 @@
 	<RT.FactionSpawnChancePerTravelDayCount>Trader faction selection weight per {0} travel duration from nearest faction settlement: </RT.FactionSpawnChancePerTravelDayCount>
 	<RT.FactionTraderSpawnChanceWeightsPerFactionBaseDensity>Trader faction spawn chance per faction base density in {0} travel duration from player's settlement</RT.FactionTraderSpawnChanceWeightsPerFactionBaseDensity>
 	<RT.FactionSpawnChancePerFactionBaseDensity>Trader faction selection weight per {0} base density: </RT.FactionSpawnChancePerFactionBaseDensity>
-	<RT.Impact>Impact ({0})</RT.Impact>
+	<RT.Impact>Frequency impact ({0})</RT.Impact>
 	<RT.Base>Base {0}: {1}</RT.Base>
 	<RT.Final>Final {0}: {1}</RT.Final>
+	<RT.MostProbablyFactionsForTrading>Most probable Trading factions would be:</RT.MostProbablyFactionsForTrading>
+	<RT.FactionWithFinalWeight>{0}. {1} with final weight: {2}</RT.FactionWithFinalWeight>
+	
 </LanguageData>
