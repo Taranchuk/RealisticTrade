@@ -234,12 +234,10 @@ namespace RealisticTrade
             base.MapComponentTick();
             if (map.IsPlayerHome && Find.TickManager.TicksGame % 60000 == 0)
             {
-                Log.Message("friendlySettlementsNearby: 1: " + Find.TickManager.TicksGame);
                 friendlySettlementsNearby = await Task.Run(() =>
                 {
                     return CalculateFriendlySettlementsNearby();
-                }); 
-                Log.Message("friendlySettlementsNearby: 2: " + Find.TickManager.TicksGame);
+                });
             }
         }
 
@@ -277,8 +275,6 @@ namespace RealisticTrade
 
         private List<(Settlement settlement, float daysToArrive)> CalculateFriendlySettlementsNearby()
         {
-            Log.Message("CalculateFriendlySettlementsNearby: 1");
-
             friendlySettlementsNearby = new List<(Settlement settlement, float daysToArrive)>();
             Predicate<Settlement> validator = delegate (Settlement x)
             {
@@ -303,7 +299,6 @@ namespace RealisticTrade
                 }
             }
             lastNearbySettlementCheckTick = Find.TickManager.TicksGame;
-            Log.Message("CalculateFriendlySettlementsNearby: 2");
             return friendlySettlementsNearby;
         }
     }
