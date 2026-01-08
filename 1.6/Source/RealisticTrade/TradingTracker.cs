@@ -31,16 +31,17 @@ namespace RealisticTrade
             base.MapComponentTick();
             if (map.IsPlayerHome && Find.TickManager.TicksGame % 60000 == 0)
             {
+                Core.Log($"TradingTracker: Recalculating friendly settlements for map {map}");
                 var result = await Task.Run(() =>
                 {
                     return CalculateFriendlySettlementsNearby();
                 });
                 friendlySettlementsNearby = result;
                 lastNearbySettlementCheckTick = Find.TickManager.TicksGame;
+                Core.Log($"TradingTracker: Found {result.Count} friendly settlements for map {map}");
             }
         }
 
-        public int lastLogTime = -1;
         public float GetTradeIncidentSpawnOrCountModifier()
         {
             var count = this.FriendlySettlementsNearby().Count;
@@ -54,12 +55,11 @@ namespace RealisticTrade
             }
             modifier *= RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season);
             modifier *= RealisticTradeMod.settings.colonyWealthAttractionBonusCurve.Evaluate(mapWealth);
-            if (lastLogTime == -1 || Find.TickManager.TicksGame - lastLogTime >= GenDate.TicksPerDay)
+            if (Core.debug)
             {
-                lastLogTime = Find.TickManager.TicksGame;
-                Log.Message($"FINAL_TRADER_PER_YEAR map wealth in {this.map} is {mapWealth}, factionWeight: {RealisticTradeMod.settings.colonyWealthAttractionBonusCurve.Evaluate(mapWealth)}");
-                Log.Message($"FINAL_TRADER_PER_YEAR Count of neutral/ally bases (faction relatinship is >=0) around {this.map} is {count}, factionWeight: {RealisticTradeMod.settings.totalSettlementCountBonusCurve.Evaluate(count)}");
-                Log.Message($"FINAL_TRADER_PER_YEAR Season is {season}, factionWeight: {RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season)}");
+                Core.Log($"FINAL_TRADER_PER_YEAR map wealth in {this.map} is {mapWealth}, factionWeight: {RealisticTradeMod.settings.colonyWealthAttractionBonusCurve.Evaluate(mapWealth)}");
+                Core.Log($"FINAL_TRADER_PER_YEAR Count of neutral/ally bases (faction relatinship is >=0) around {this.map} is {count}, factionWeight: {RealisticTradeMod.settings.totalSettlementCountBonusCurve.Evaluate(count)}");
+                Core.Log($"FINAL_TRADER_PER_YEAR Season is {season}, factionWeight: {RealisticTradeMod.settings.seasonImpactBonusCurve.Evaluate((int)season)}");
             }
             return modifier;
         }
@@ -92,6 +92,7 @@ namespace RealisticTrade
 
             var settlements = Find.World.worldObjects.SettlementBases.Where(x => validator(x)).ToList();
             int maxDist = Mathf.CeilToInt(RealisticTradeMod.settings.maxTravelDistancePeriodForTrading * 60000f / 3300f);
+            Core.Log($"CalculateFriendlySettlementsNearby: Found {settlements.Count} potential settlements, max distance: {maxDist} tiles");
 
             foreach (var settlement in settlements)
             {
@@ -110,6 +111,7 @@ namespace RealisticTrade
                     }
                 }
             }
+            Core.Log($"CalculateFriendlySettlementsNearby: Found {result.Count} settlements within travel range for map {map}");
             return result;
         }
     }

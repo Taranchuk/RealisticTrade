@@ -1,19 +1,12 @@
-﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using HarmonyLib;
 using RimWorld;
 using UnityEngine;
 using Verse;
-using Verse.AI;
 
 namespace RealisticTrade
 {
-
-    class RealisticTradeSettings : ModSettings
+    public class RealisticTradeSettings : ModSettings
     {
         public int maxTravelDistancePeriodForTrading = 7;
         public bool scaleValuesByWorldSize;
@@ -102,7 +95,7 @@ namespace RealisticTrade
                         factionWeightSize += ButtonsSize(1);
                         var factionsWithWeight = Find.FactionManager.AllFactions.Where((Faction f) =>
                         incidentWorker.FactionCanBeGroupSource(f, new IncidentParms { target = map }, true))
-                            .Select(x => (x, TryResolveParmsGeneral_Patch.GetWeight(map, x))).OrderByDescending(x => x.Item2).Take(5).ToList();
+                            .Select(x => (x, IncidentWorker_TraderCaravanArrival_TryResolveParmsGeneral_Patch.GetWeight(map, x))).OrderByDescending(x => x.Item2).Take(5).ToList();
                         for (var i = 0; i < factionsWithWeight.Count; i++)
                         {
                             factionWeightSize += ButtonsSize(1);
@@ -217,7 +210,7 @@ namespace RealisticTrade
                         factionWeightSection.Label(map.Parent.LabelCap);
                         var factionsWithWeight = Find.FactionManager.AllFactions.Where((Faction f) =>
                         incidentWorker.FactionCanBeGroupSource(f, new IncidentParms { target = map }, true))
-                            .Select(x => (x, TryResolveParmsGeneral_Patch.GetWeight(map, x))).OrderByDescending(x => x.Item2).Take(5).ToList();
+                            .Select(x => (x, IncidentWorker_TraderCaravanArrival_TryResolveParmsGeneral_Patch.GetWeight(map, x))).OrderByDescending(x => x.Item2).Take(5).ToList();
                         for (var i = 0; i < factionsWithWeight.Count; i++)
                         {
                             var kvp = factionsWithWeight[i];
